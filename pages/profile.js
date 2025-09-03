@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { userId } = router.query;
+
   const [name, setName] = useState('');
   const [dob, setDob] = useState('');
   const [sex, setSex] = useState('');
   const [age, setAge] = useState('');
   const [phones, setPhones] = useState(['']);
   const [addresses, setAddresses] = useState(['']);
+  const [password, setPassword] = useState('');  // New state for password
 
   useEffect(() => {
     if (dob) {
@@ -55,10 +60,33 @@ export default function ProfilePage() {
     setAddresses(newAddresses);
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    // Save or update profile logic here
-    alert('Profile saved/updated');
+    if (!userId) {
+      alert('Missing userId');
+      return;
+    }
+    const res = await fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        name,
+        dob,
+        sex,
+        age,
+        phones,
+        addresses,
+        password,  // Include password in request if provided
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.message || 'Profile save failed');
+      return;
+    }
+    alert(data.message);
+    setPassword('');  // Clear password field after submission
   }
 
   return (
@@ -111,6 +139,17 @@ export default function ProfilePage() {
             <option value="female">Female</option>
             <option value="other">Other</option>
           </select>
+        </label>
+
+        <label>
+          New Password (optional):
+          <input
+            style={styles.input}
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Enter new password to update"
+          />
         </label>
 
         <fieldset style={styles.fieldset}>
