@@ -1,0 +1,25 @@
+# Maven build
+target/
+*.class
+*.jar
+*.war
+
+# IDE/Project files
+.classpath
+.factorypath
+.project
+.settings/
+.mvn/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database volumes
+mysql_data/
+
+# Backup files
+*.orig
