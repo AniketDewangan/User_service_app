@@ -1,11 +1,11 @@
 package com.example.users.controller;
 
-
 import com.example.users.dto.LoginRequest;
 import com.example.users.dto.LoginResponse;
 import com.example.users.dto.ProfileRequest;
 import com.example.users.dto.ProfileResponse;
 import com.example.users.model.Profile;
+import com.example.users.model.ProfileHistory;
 import com.example.users.service.ProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -22,7 +22,6 @@ import java.time.Period;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
 
 @RestController
 @RequestMapping("/api/profiles")
@@ -71,8 +70,59 @@ public class ProfileController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Profile not found");
         }
     }
-    
-    
+
+    @PostMapping
+    @Operation(summary = "Create a new profile", description = "Creates a new profile")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Profile created successfully"),
+        @ApiResponse(responseCode = "400", description = "Email already exists")
+    })
+    public ResponseEntity<?> createProfile(@Valid @RequestBody ProfileRequest profileRequest) {
+        // Check if email already exists
+        if (profileService.getProfileByEmail(profileRequest.getEmail()).isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Email already exists: " + profileRequest.getEmail());
+        }
+
+        Profile profile = convertToEntity(profileRequest);
+        // Save with password hashing
+        Profile savedProfile = profileService.saveOrUpdateProfileWithPassword(profile, profileRequest.getPassword());
+        return ResponseEntity.status(HttpStatus.CREATED).body(convertToResponse(savedProfile));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update profile", description = "Updates an existing profile and tracks history")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Profile updated successfully"),
+        @ApiResponse(responseCode = "404", description = "Profile not found")
+    })
+    public ResponseEntity<?> updateProfile(
+            @PathVariable Long id, 
+            @Valid @RequestBody ProfileRequest profileRequest) {
+        
+        Optional<Profile> existingProfileOpt = profileService.getProfileById(id);
+        if (existingProfileOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Profile not found");
+        }
+
+        Profile existingProfile = existingProfileOpt.get();
+        String previousValuesJson = existingProfile.getCurrentValuesAsJson();
+
+        // Check if email is being changed to one that already exists
+        Optional<Profile> profileWithEmail = profileService.getProfileByEmail(profileRequest.getEmail());
+        if (profileWithEmail.isPresent() && !profileWithEmail.get().getId().equals(id)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Email already exists: " + profileRequest.getEmail());
+        }
+
+        Profile updatedProfile = convertToEntity(profileRequest);
+        Profile savedProfile = profileService.updateProfileWithHistory(
+            existingProfile, updatedProfile, previousValuesJson
+        );
+        
+        return ResponseEntity.ok(convertToResponse(savedProfile));
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticates a user by email and password")
     @ApiResponses({
@@ -107,56 +157,36 @@ public class ProfileController {
             profile.getEmail()
         ));
     }
-    
-    
 
-    @PostMapping
-    @Operation(summary = "Create a new profile", description = "Creates a new profile")
+    @GetMapping("/{id}/history")
+    @Operation(summary = "Get profile update history", description = "Retrieves the update history for a profile")
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Profile created successfully"),
-        @ApiResponse(responseCode = "400", description = "Email already exists")
-    })
-    public ResponseEntity<?> createProfile(@Valid @RequestBody ProfileRequest profileRequest) {
-        // Check if email already exists
-        if (profileService.getProfileByEmail(profileRequest.getEmail()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Email already exists: " + profileRequest.getEmail());
-        }
-
-        Profile profile = convertToEntity(profileRequest);
-        // Save with password hashing
-        Profile savedProfile = profileService.saveOrUpdateProfileWithPassword(profile, profileRequest.getPassword());
-        return ResponseEntity.status(HttpStatus.CREATED).body(convertToResponse(savedProfile));
-    }
-
-    @PutMapping("/{id}")
-    @Operation(summary = "Update profile", description = "Updates an existing profile")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Profile updated successfully"),
+        @ApiResponse(responseCode = "200", description = "History retrieved successfully"),
         @ApiResponse(responseCode = "404", description = "Profile not found")
     })
-    public ResponseEntity<?> updateProfile(
-            @PathVariable Long id, 
-            @Valid @RequestBody ProfileRequest profileRequest) {
-        
-        Optional<Profile> existingProfile = profileService.getProfileById(id);
-        if (existingProfile.isEmpty()) {
+    public ResponseEntity<?> getProfileHistory(@PathVariable Long id) {
+        Optional<Profile> profile = profileService.getProfileById(id);
+        if (profile.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Profile not found");
         }
 
-        // Check if email is being changed to one that already exists (excluding current profile)
-        Optional<Profile> profileWithEmail = profileService.getProfileByEmail(profileRequest.getEmail());
-        if (profileWithEmail.isPresent() && !profileWithEmail.get().getId().equals(id)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Email already exists: " + profileRequest.getEmail());
+        List<ProfileHistory> history = profileService.getProfileHistory(id);
+        return ResponseEntity.ok(history);
+    }
+
+    @GetMapping("/{id}/update-count")
+    @Operation(summary = "Get profile update count", description = "Retrieves the number of updates for a profile")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Update count retrieved"),
+        @ApiResponse(responseCode = "404", description = "Profile not found")
+    })
+    public ResponseEntity<?> getUpdateCount(@PathVariable Long id) {
+        Optional<Profile> profile = profileService.getProfileById(id);
+        if (profile.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Profile not found");
         }
 
-        Profile profile = convertToEntity(profileRequest);
-        profile.setId(id); // Set the ID for update
-        
-        // Save with password hashing
-        Profile savedProfile = profileService.saveOrUpdateProfileWithPassword(profile, profileRequest.getPassword());
-        return ResponseEntity.ok(convertToResponse(savedProfile));
+        return ResponseEntity.ok(new UpdateCountResponse(profile.get().getUpdateCount()));
     }
 
     @PostMapping("/{id}/verify-password")
@@ -200,17 +230,6 @@ public class ProfileController {
     public ResponseEntity<String> test() {
         return ResponseEntity.ok("Profile controller is working!");
     }
-    
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<ProfileResponse> getProfileByUserId(@PathVariable Long userId) {
-        Optional<Profile> profileOpt = profileService.getProfileById(userId);
-        if (profileOpt.isPresent()) {
-            return ResponseEntity.ok(convertToResponse(profileOpt.get()));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-    }
-
 
     private Profile convertToEntity(ProfileRequest request) {
         Profile profile = new Profile();
@@ -273,6 +292,89 @@ public class ProfileController {
 
         public void setMatches(boolean matches) {
             this.matches = matches;
+        }
+    }
+
+    // DTO for update count response
+    public static class UpdateCountResponse {
+        private int updateCount;
+        private String message;
+
+        public UpdateCountResponse(int updateCount) {
+            this.updateCount = updateCount;
+            this.message = "Profile has been updated " + updateCount + " times";
+        }
+
+        public int getUpdateCount() {
+            return updateCount;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+    }
+
+    // DTO for login request
+    public static class LoginRequest {
+        private String email;
+        private String password;
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+
+    // DTO for login response
+    public static class LoginResponse {
+        private boolean success;
+        private String message;
+        private Long profileId;
+        private String name;
+        private String email;
+
+        public LoginResponse(boolean success, String message) {
+            this.success = success;
+            this.message = message;
+        }
+
+        public LoginResponse(boolean success, String message, Long profileId, String name, String email) {
+            this.success = success;
+            this.message = message;
+            this.profileId = profileId;
+            this.name = name;
+            this.email = email;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public Long getProfileId() {
+            return profileId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getEmail() {
+            return email;
         }
     }
 }

@@ -1,7 +1,6 @@
 package com.example.users.model;
 
 import lombok.Data;
-
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -34,8 +33,14 @@ public class Profile {
     private String sex;
 
     @NotBlank
-    @Column(length = 100) // Increased length for BCrypt hash
+    @Column(length = 100)
     private String password;
+
+    @Column(name = "update_count", nullable = false)
+    private int updateCount = 0; // Track number of updates
+
+    @OneToMany(mappedBy = "profile", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<ProfileHistory> history; // History of updates
 
     @ElementCollection
     @CollectionTable(name = "profile_phones", joinColumns = @JoinColumn(name = "profile_id"))
@@ -46,4 +51,15 @@ public class Profile {
     @CollectionTable(name = "profile_addresses", joinColumns = @JoinColumn(name = "profile_id"))
     @Column(name = "address")
     private List<String> addresses;
+
+    // Method to increment update count
+    public void incrementUpdateCount() {
+        this.updateCount++;
+    }
+
+    // Method to get current values as JSON (for history)
+    public String getCurrentValuesAsJson() {
+        return String.format("{\"name\":\"%s\",\"email\":\"%s\",\"sex\":\"%s\",\"age\":%d,\"phones\":%s,\"addresses\":%s}",
+                name, email, sex, age, phones.toString(), addresses.toString());
+    }
 }
