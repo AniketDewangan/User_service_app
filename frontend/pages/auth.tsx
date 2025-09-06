@@ -3,18 +3,23 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/router";
 import { apiLogin, apiRegisterProfile } from "../lib/api";
 import { DynamicList } from "../components/DynamicList";
+import AddressList from "../components/AddressList";
+import { AddressItem, encodeAddress, validateAddressItems } from "../lib/addressCodec";
+import { toApiDate } from "../lib/date";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
+
+  // Always required
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Register-specific fields (required by your backend)
+  // Optional on register
   const [name, setName] = useState("");
-  const [dob, setDob] = useState(""); // YYYY-MM-DD
+  const [dob, setDob] = useState(""); // UI uses yyyy-MM-dd
   const [sex, setSex] = useState("");
   const [phones, setPhones] = useState<string[]>([""]);
-  const [addresses, setAddresses] = useState<string[]>([""]);
+  const [addressItems, setAddressItems] = useState<AddressItem[]>([{ address: "", pincode: "" }]);
 
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
@@ -26,17 +31,28 @@ export default function AuthPage() {
     setLoading(true);
     try {
       if (mode === "register") {
-        // Build ProfileRequest
-        await apiRegisterProfile({
-          name: name.trim(),
+        // If address provided, require 6-digit PIN
+        if (!validateAddressItems(addressItems)) {
+          throw new Error("Pincode must be 6 digits for every entered address.");
+        }
+
+        // Build payload: only include optional fields if present
+        const payload: any = {
           email: email.trim(),
-          dob,
-          sex,
           password,
-          phones: phones.filter(Boolean),
-          addresses: addresses.filter(Boolean),
-        });
-        // registration sets session; go to profile
+        };
+        if (name.trim()) payload.name = name.trim();
+        const dobApi = toApiDate(dob);
+        if (dobApi) payload.dob = dobApi;
+        if (sex) payload.sex = sex;
+
+        const ph = phones.filter(Boolean);
+        if (ph.length) payload.phones = ph;
+
+        const mergedAddresses = addressItems.map(encodeAddress).filter(Boolean);
+        if (mergedAddresses.length) payload.addresses = mergedAddresses;
+
+        await apiRegisterProfile(payload);
         router.push("/profile");
       } else {
         await apiLogin({ email: email.trim(), password });
@@ -65,12 +81,12 @@ export default function AuthPage() {
           <>
             <div className="row">
               <div className="col">
-                <label>Name</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" required />
+                <label>Name (optional)</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
               </div>
               <div className="col">
-                <label>Sex</label>
-                <select value={sex} onChange={(e) => setSex(e.target.value)} required>
+                <label>Sex (optional)</label>
+                <select value={sex} onChange={(e) => setSex(e.target.value)}>
                   <option value="">Select…</option>
                   <option>Male</option>
                   <option>Female</option>
@@ -81,8 +97,8 @@ export default function AuthPage() {
             </div>
             <div className="row">
               <div className="col">
-                <label>Date of Birth</label>
-                <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} required />
+                <label>Date of Birth (optional)</label>
+                <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
               </div>
             </div>
           </>
@@ -101,8 +117,8 @@ export default function AuthPage() {
 
         {mode === "register" && (
           <>
-            <DynamicList label="Phone Numbers" values={phones} onChange={setPhones} placeholder="+91-XXXXXXXXXX" />
-            <DynamicList label="Addresses" values={addresses} onChange={setAddresses} placeholder="House, Street, City, State, PIN" />
+            <DynamicList label="Phone Numbers (optional)" values={phones} onChange={setPhones} placeholder="+91-XXXXXXXXXX" />
+            <AddressList items={addressItems} onChange={setAddressItems} />
           </>
         )}
 
