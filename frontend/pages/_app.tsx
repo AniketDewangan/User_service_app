@@ -9,7 +9,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <div className="app">
       <nav className="nav">
-        <div className="brand"><Link href="/">User Service Frontend</Link></div>
+        <div className="brand"><Link href="/">User Service</Link></div>
         <div>
           <Link href="/auth">Login / Register</Link>
           <Link href="/profile">Profile</Link>

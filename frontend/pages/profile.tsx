@@ -5,29 +5,34 @@ import {
   apiUpdateProfile,
   getSession,
   clearSession,
-  ProfileRequest,
+  ProfileUpdatePayload,
   ProfileResponse,
 } from "../lib/api";
 import { useRouter } from "next/router";
 import { DynamicList } from "../components/DynamicList";
+import AddressList from "../components/AddressList";
+import { AddressItem, decodeAddress, encodeAddress, validateAddressItems } from "../lib/addressCodec";
+import { fromApiDate, toApiDate, toDisplayDate } from "../lib/date";
 
 export default function ProfilePage() {
   const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [original, setOriginal] = useState<ProfileResponse | null>(null);
 
-  // editable state
+  // Editable state
   const [name, setName] = useState("");
   const [email, setEmail] = useState(""); // read-only
-  const [dob, setDob] = useState("");
+  const [dob, setDob] = useState("");     // UI value: yyyy-MM-dd
   const [age, setAge] = useState<number>(0);
   const [sex, setSex] = useState("");
   const [phones, setPhones] = useState<string[]>([""]);
-  const [addresses, setAddresses] = useState<string[]>([""]);
-  const [password, setPassword] = useState(""); // REQUIRED on update by backend
+  const [addressItems, setAddressItems] = useState<AddressItem[]>([{ address: "", pincode: "" }]);
 
-  const [original, setOriginal] = useState<ProfileResponse | null>(null);
+  // backend requires password on update
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -41,13 +46,16 @@ export default function ProfilePage() {
         const p = await apiGetProfileById(s.profileId);
         setProfile(p);
         setOriginal(p);
+
         setName(p.name || "");
         setEmail(p.email || "");
-        setDob(p.dob || "");
+        setDob(fromApiDate(p.dob));  // <-- coerce to yyyy-MM-dd for input
         setAge(p.age || 0);
         setSex(p.sex || "");
         setPhones(p.phones?.length ? p.phones : [""]);
-        setAddresses(p.addresses?.length ? p.addresses : [""]);
+
+        const decoded: AddressItem[] = (p.addresses?.length ? p.addresses : [""]).map((s) => decodeAddress(s));
+        setAddressItems(decoded.length ? decoded : [{ address: "", pincode: "" }]);
       } catch (err: any) {
         setError(err?.message || "Failed to load profile");
       } finally {
@@ -56,49 +64,78 @@ export default function ProfilePage() {
     })();
   }, []);
 
-  // derive age when DOB changes
   useEffect(() => {
     if (!dob) return;
-    const d = new Date(dob);
-    if (isNaN(d.getTime())) return;
+    // derive age from dob (yyyy-MM-dd)
+    const parts = dob.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!parts) return;
+    const y = +parts[1], m = +parts[2], d = +parts[3];
+    const dt = new Date(y, m - 1, d);
+    if (Number.isNaN(dt.getTime())) return;
     const now = new Date();
-    let a = now.getFullYear() - d.getFullYear();
-    const m = now.getMonth() - d.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+    let a = now.getFullYear() - dt.getFullYear();
+    const mm = now.getMonth() - dt.getMonth();
+    if (mm < 0 || (mm === 0 && now.getDate() < dt.getDate())) a--;
     setAge(a);
   }, [dob]);
 
+  const prettyOriginalAddresses = useMemo(() => {
+    const arr = original?.addresses ?? [];
+    return arr.map((s) => {
+      const { address, pincode } = decodeAddress(s);
+      return pincode ? `${address}, ${pincode}` : address;
+    }).join("\n");
+  }, [original]);
+
   const changed = useMemo(() => {
     if (!original) return false;
-    const cur = JSON.stringify({ name, email, dob, sex, phones, addresses });
-    const base = JSON.stringify({
-      name: original.name, email: original.email, dob: original.dob, sex: original.sex,
-      phones: original.phones, addresses: original.addresses
+    const current = JSON.stringify({
+      name,
+      email,
+      dob: toApiDate(dob), // compare as API format
+      sex,
+      phones,
+      addresses: addressItems.map(encodeAddress).filter(Boolean),
     });
-    return cur !== base || !!password;
-  }, [name, email, dob, sex, phones, addresses, password, original]);
+    const baseline = JSON.stringify({
+      name: original.name,
+      email: original.email,
+      dob: toApiDate(original.dob),
+      sex: original.sex,
+      phones: original.phones,
+      addresses: original.addresses,
+    });
+    return current !== baseline || !!password;
+  }, [name, email, dob, sex, phones, addressItems, password, original]);
 
   async function save() {
     setError(undefined);
     try {
       if (!profile?.id) throw new Error("Missing profile id");
-      if (!password.trim()) {
-        // Your backend requires password in ProfileRequest for updates
-        throw new Error("Password is required to save changes.");
+      if (!password.trim()) throw new Error("Password is required to save changes.");
+      if (!validateAddressItems(addressItems)) {
+        throw new Error("Pincode must be 6 digits for every entered address.");
       }
-      const payload: ProfileRequest = {
-        name: name.trim(),
-        email: email.trim(),    // frozen in UI, still must send
-        dob,
-        sex,
-        password,               // REQUIRED
-        phones: phones.filter(Boolean),
-        addresses: addresses.filter(Boolean),
+
+      const mergedAddresses = addressItems.map(encodeAddress).filter(Boolean);
+      const payload: ProfileUpdatePayload = {
+        email: email.trim(),            // frozen; backend expects it
+        password,                       // REQUIRED on update
+        name: name.trim() || undefined,
+        dob: toApiDate(dob),            // <-- send API format yyyy-MM-dd (or undefined)
+        sex: sex || undefined,
+        phones: phones.filter(Boolean) || undefined,
+        addresses: mergedAddresses.length ? mergedAddresses : undefined,
       };
+
       const updated = await apiUpdateProfile(profile.id, payload);
       setProfile(updated);
       setOriginal(updated);
-      setPassword(""); // clear field after successful update
+      setPassword("");
+
+      const decoded = (updated.addresses || []).map((s) => decodeAddress(s));
+      setAddressItems(decoded.length ? decoded : [{ address: "", pincode: "" }]);
+      setDob(fromApiDate(updated.dob)); // keep input normalized
     } catch (err: any) {
       setError(err?.message || "Update failed");
     }
@@ -108,23 +145,25 @@ export default function ProfilePage() {
     if (!original) return;
     setName(original.name || "");
     setEmail(original.email || "");
-    setDob(original.dob || "");
+    setDob(fromApiDate(original.dob));
     setAge(original.age || 0);
     setSex(original.sex || "");
     setPhones(original.phones?.length ? original.phones : [""]);
-    setAddresses(original.addresses?.length ? original.addresses : [""]);
+    const decoded = (original.addresses?.length ? original.addresses : [""]).map((s) => decodeAddress(s));
+    setAddressItems(decoded.length ? decoded : [{ address: "", pincode: "" }]);
     setPassword("");
   }
 
   if (loading) return <div className="card">Loading…</div>;
-  if (error) return (
-    <div className="card">
-      <div className="alert">{error}</div>
-      <div className="toolbar">
-        <button onClick={() => router.push("/auth")}>Go to Login</button>
+  if (error)
+    return (
+      <div className="card">
+        <div className="alert">{error}</div>
+        <div className="toolbar">
+          <button onClick={() => router.push("/auth")}>Go to Login</button>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <>
@@ -140,6 +179,7 @@ export default function ProfilePage() {
             <input value={email} readOnly />
           </div>
         </div>
+
         <div className="grid2" style={{ marginTop: 12 }}>
           <div>
             <label>Date of Birth</label>
@@ -147,9 +187,14 @@ export default function ProfilePage() {
           </div>
           <div>
             <label>Age</label>
-            <input type="number" value={age} onChange={(e) => setAge(Number(e.target.value) || 0)} />
+            <input
+              type="number"
+              value={age}
+              onChange={(e) => setAge(Number(e.target.value) || 0)}
+            />
           </div>
         </div>
+
         <div className="grid2" style={{ marginTop: 12 }}>
           <div>
             <label>Sex</label>
@@ -174,7 +219,7 @@ export default function ProfilePage() {
       </div>
 
       <DynamicList label="Phone Numbers" values={phones} onChange={setPhones} placeholder="+91-XXXXXXXXXX" />
-      <DynamicList label="Addresses" values={addresses} onChange={setAddresses} placeholder="House, Street, City, State, PIN" />
+      <AddressList items={addressItems} onChange={setAddressItems} />
 
       <div className="card">
         <div className="toolbar">
@@ -182,7 +227,9 @@ export default function ProfilePage() {
           <button className="ghost" onClick={reset} disabled={!changed}>Reset to Original</button>
           <button className="danger" onClick={() => { clearSession(); location.href = "/auth"; }}>Logout</button>
         </div>
-        <p className="small">Email is frozen. Your backend requires entering a password to update.</p>
+        <p className="small">
+          Email is frozen. Password is required to update. Each entered address must have a 6-digit pincode.
+        </p>
       </div>
 
       <div className="card">
@@ -192,7 +239,7 @@ export default function ProfilePage() {
           <div className="col"><label>Email</label><input readOnly value={original?.email || ""} /></div>
         </div>
         <div className="row">
-          <div className="col"><label>DOB</label><input readOnly value={original?.dob || ""} /></div>
+          <div className="col"><label>DOB</label><input readOnly value={toDisplayDate(original?.dob)} /></div>
           <div className="col"><label>Age</label><input readOnly value={original?.age ?? 0} /></div>
         </div>
         <div className="row">
@@ -200,7 +247,9 @@ export default function ProfilePage() {
         </div>
         <div className="row">
           <div className="col"><label>Phones</label><textarea readOnly value={(original?.phones || []).join("\n")} rows={3} /></div>
-          <div className="col"><label>Addresses</label><textarea readOnly value={(original?.addresses || []).join("\n")} rows={3} /></div>
+          <div className="col"><label>Addresses</label><textarea readOnly value={
+            (original?.addresses ?? []).map((s)=>{ const {address,pincode}=decodeAddress(s); return pincode?`${address}, ${pincode}`:address; }).join("\n")
+          } rows={3} /></div>
         </div>
       </div>
     </>

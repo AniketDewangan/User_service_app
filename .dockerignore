@@ -1,0 +1,21 @@
+# Ignore Git
+.git
+.gitignore
+
+# Ignore IDEs
+.vscode/
+.idea/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore build outputs
+**/target/
+**/node_modules/
+**/.next/
+**/dist/
+**/out/
+
+# Ignore database volumes
+backend/users-service/mysql_data/

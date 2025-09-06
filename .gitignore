@@ -1,25 +1,63 @@
-# Maven build
-target/
-*.class
-*.jar
-*.war
-
-# IDE/Project files
-.classpath
-.factorypath
-.project
-.settings/
-.mvn/
-
-# OS files
+# ====================
+# OS / System files
+# ====================
 .DS_Store
 Thumbs.db
 
+# ====================
+# Node.js / Frontend
+# ====================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/build/
+frontend/.qodo/
+
 # Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# ====================
+# Java / Spring Boot / Backend
+# ====================
+backend/users-service/target/
+backend/users-service/mysql_data/
+backend/users-service/.qodo/
+
+# Logs
+backend/users-service/logs/
 *.log
 
-# Database volumes
-mysql_data/
+# ====================
+# IDE / Editor files
+# ====================
+*.iml
+*.idea/
+*.vscode/
+*.classpath
+*.project
+*.settings/
 
-# Backup files
-*.orig
+# ====================
+# Environment / Config files
+# ====================
+
+*.env.development.local
+*.env.test.local
+*.env.production.local
+
+# ====================
+# Build / Temp files
+# ====================
+*.class
+*.jar
+*.war
+*.ear
+
+# ====================
+# Optional package lock (include if you want consistent deps)
+# ====================
+# package-lock.json
+# yarn.lock
