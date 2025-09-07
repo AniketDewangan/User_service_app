@@ -16,13 +16,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Copy package.json and install only production dependencies
-COPY --from=builder /app/package*.json ./
-RUN npm ci --only=production
+COPY package*.json ./
+RUN npm install --only=production
 
 # Copy built app from builder stage
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/pages ./pages   
+# If using /app directory (Next 13+ App Router), also add:
+# COPY --from=builder /app/app ./app
 
 # Expose port and run
 EXPOSE 3000

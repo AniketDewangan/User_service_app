@@ -1,8 +1,8 @@
 # Node modules and build output
 node_modules/
-.next/
-out/
-dist/
+#.next/
+#out/
+# dist/
 
 # Logs
 npm-debug.log*
@@ -11,11 +11,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Env files (you may keep these in docker-compose instead)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+
 
 # IDE files
 .vscode/

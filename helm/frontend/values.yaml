@@ -1,0 +1,16 @@
+replicaCount: 1
+
+image:
+  repository: kd57/users-frontend
+  pullPolicy: IfNotPresent
+  tag: v1.1
+
+service:
+  type: ClusterIP
+  port: 3000
+
+env:
+  - name: REACT_APP_API_URL
+    value: http://users-backend:8080
+
+resources: {}
