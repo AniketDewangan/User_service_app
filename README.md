@@ -33,15 +33,6 @@ npm run dev
 
 The frontend will start at [http://localhost:3000](http://localhost:3000).
 
-### Database
-
-Ensure MySQL is running locally.
-Create a database `userdb` and configure credentials in:
-
-```
-User_service_app/backend/users-service/src/main/resources/application.yml
-```
-
 ---
 
 ## 2. Run with Docker Compose
