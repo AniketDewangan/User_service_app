@@ -1,0 +1,58 @@
+@echo off
+set BASE_URL=http://localhost:8080
+
+echo === Health Check ===
+curl -i %BASE_URL%/api/health
+echo.
+
+echo === Get All Profiles ===
+curl -i %BASE_URL%/api/profiles
+echo.
+
+echo === Create Profile ===
+curl -i -X POST %BASE_URL%/api/profiles ^
+  -H "Content-Type: application/json" ^
+  -d "{\"name\":\"John Doe\",\"email\":\"john.doe@example.com\",\"dob\":\"1990-01-01\",\"sex\":\"M\",\"password\":\"secret123\",\"phones\":[\"+911234567890\"],\"addresses\":[\"123 Street, City\"]}"
+echo.
+
+echo === Get Profile By ID ===
+curl -i %BASE_URL%/api/profiles/1
+echo.
+
+echo === Update Profile ===
+curl -i -X PUT %BASE_URL%/api/profiles/1 ^
+  -H "Content-Type: application/json" ^
+  -d "{\"name\":\"John Updated\",\"email\":\"john.doe@example.com\",\"dob\":\"1990-01-01\",\"sex\":\"M\",\"password\":\"secret123\",\"phones\":[\"+911234567890\"],\"addresses\":[\"456 New Street, City\"]}"
+echo.
+
+echo === Delete Profile ===
+curl -i -X DELETE %BASE_URL%/api/profiles/1
+echo.
+
+echo === Get Profile By Email ===
+curl -i %BASE_URL%/api/profiles/email/john.doe@example.com
+echo.
+
+echo === Verify Password ===
+curl -i -X POST %BASE_URL%/api/profiles/1/verify-password ^
+  -H "Content-Type: application/json" ^
+  -d "{\"password\":\"secret123\"}"
+echo.
+
+echo === Login ===
+curl -i -X POST %BASE_URL%/api/profiles/login ^
+  -H "Content-Type: application/json" ^
+  -d "{\"email\":\"john.doe@example.com\",\"password\":\"secret123\"}"
+echo.
+
+echo === Get Profile Update Count ===
+curl -i %BASE_URL%/api/profiles/1/update-count
+echo.
+
+echo === Get Profile History ===
+curl -i %BASE_URL%/api/profiles/1/history
+echo.
+
+echo === Test Endpoint ===
+curl -i %BASE_URL%/api/profiles/test
+echo.
