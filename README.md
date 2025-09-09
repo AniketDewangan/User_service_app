@@ -1,198 +1,133 @@
 
-# User Service App
 
-A full-stack application consisting of:
-- **Backend**: Spring Boot (Java, Maven)  
-- **Frontend**: Next.js (React, Node.js)  
-- **Database**: MySQL  
+# Project Overview
 
-This project is containerized with Docker and can be deployed in multiple ways:
-- Local development (run backend & frontend separately)
-- Docker Compose
-- Kubernetes via Helm
-- GitOps with ArgoCD
-- Terraform (for infra provisioning)
+```
+
+├─ User_service_app/                # Full-stack app
+│  ├─ backend/
+│  │  └─ users-service/             # Spring Boot service
+│  ├─ frontend/                     # Next.js frontend
+│  ├─ helm/                         # Helm charts (backend, frontend)
+│  ├─ argocd/                       # ArgoCD manifests
+│  ├─ terraform/                    # Infra as code
+│  ├─ docker-compose.yml            # Compose for backend+frontend+db
+│  
+├─ medallion-etl/                   # PySpark ETL with Jupyter
+│  ├─ Dockerfile
+│  ├─ docker-compose.yml
+│  ├─ workspace/
+│  │  └─ Medallion_PySpark_4CSVs.ipynb
+│  ├─ data/
+│  │  ├─ profiles.csv
+│  │  ├─ profile_phones.csv
+│  │  ├─ profile_addresses.csv
+│  │  └─ profile_history.csv
+│  └─ README.md (this doc section)  
+│
+└─ README.md                       
+```
 
 ---
 
-## 1. Run Locally (Without Docker)
+# User Service App
 
-### Backend (Spring Boot)
+A full-stack application with:
+
+* **Backend**: Spring Boot (Java, Maven)
+* **Frontend**: Next.js (React, Node.js)
+* **Database**: MySQL
+
+Deployment options: Local, Docker Compose, Kubernetes (Helm), GitOps (ArgoCD), Terraform.
+
+---
+
+## 1. Run Locally (no Docker)
+
+### Backend
+
 ```bash
 cd User_service_app/backend/users-service
 ./mvnw spring-boot:run
+```
 
+→ [http://localhost:8080](http://localhost:8080)
 
-The backend will start at [http://localhost:8080](http://localhost:8080).
+### Frontend
 
-### Frontend (Next.js)
+```bash
 cd User_service_app/frontend
 npm install
 npm run dev
 ```
 
-The frontend will start at [http://localhost:3000](http://localhost:3000).
+→ [http://localhost:3000](http://localhost:3000)
 
 ---
 
 ## 2. Run with Docker Compose
 
-Make sure Docker is installed and running.
-
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
-* Backend will be available at `http://localhost:8080`
-* Frontend will be available at `http://localhost:3000`
-* MySQL at port `3306` (configured in `docker-compose.yml`)
+* Backend → `http://localhost:8080`
+* Frontend → `http://localhost:3000`
+* MySQL → `localhost:3306`
 
 ---
 
 ## 3. Run with Kubernetes (Helm)
 
+1. Namespace:
 
+   ```bash
+   kubectl create namespace dev
+   ```
 
-### **Step 0: Make sure Kubernetes is running**
+2. MySQL:
 
-```cmd
-kubectl config current-context
-kubectl get nodes
-```
+   ```bash
+   helm repo add bitnami https://charts.bitnami.com/bitnami
+   helm install mysql bitnami/mysql \
+     --namespace dev \
+     --set auth.rootPassword=root \
+     --set auth.database=userdb \
+     --set auth.username=user \
+     --set auth.password=user123
+   ```
 
-* Context should be `docker-desktop` or your desired cluster.
-* Node status should be `Ready`.
+3. Backend:
 
+   ```bash
+   helm install users-backend ./helm/backend --namespace dev
+   ```
 
-### **Step 1: Create a namespace**
+4. Frontend:
 
-```cmd
-kubectl create namespace dev
-```
+   ```bash
+   helm install users-frontend ./helm/frontend --namespace dev
+   ```
 
-* All resources (MySQL, backend, frontend) will live in `dev`.
-* Helps keep things organized.
+5. Access via port-forward:
 
-Check:
-
-```cmd
-kubectl get namespaces
-```
-
-
-
-### **Step 2: Deploy MySQL using Bitnami Helm chart**
-
-```cmd
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-
-helm install mysql bitnami/mysql ^
-  --namespace dev ^
-  --set auth.rootPassword=root ^
-  --set auth.database=userdb ^
-  --set auth.username=user ^
-  --set auth.password=user123
-```
-
-* `mysql` → Helm release name.
-* This will create MySQL pods, service, and PVC for storage.
-
-Check pods:
-
-```cmd
-kubectl get pods -n dev
-```
-
-* Wait until MySQL pod is `Running`.
-
-Check service:
-
-```cmd
-kubectl get svc -n dev
-```
-
-* Service name will be `mysql`, port `3306`.
-
-
-
-### **Step 3: Deploy backend Helm chart**
-
-```cmd
-helm install users-backend ./helm/backend --namespace dev
-```
-
-Verify:
-
-```cmd
-kubectl get pods -n dev
-kubectl get svc -n dev
-```
-
-* Service: `users-backend`, port `8080`.
-
-
-
-### **Step 4: Deploy frontend Helm chart**
-
-```cmd
-helm install users-frontend ./helm/frontend --namespace dev
-```
-
-Verify:
-
-```cmd
-kubectl get pods -n dev
-kubectl get svc -n dev
-```
-
-* Service: `users-frontend`, port `3000`.
+   ```bash
+   kubectl port-forward svc/users-backend 8080:8080 -n dev
+   kubectl port-forward svc/users-frontend 3000:3000 -n dev
+   ```
 
 ---
 
-### **Step 5: Access services locally via port-forwarding**
-
-#### Backend:
-
-```cmd
-kubectl port-forward svc/users-backend 8080:8080 -n dev
-```
-
-* Backend API accessible at: `http://localhost:8080`
-
-#### Frontend:
-
-```cmd
-kubectl port-forward svc/users-frontend 3000:3000 -n dev
-```
-
-* Frontend accessible at: `http://localhost:3000`
-
----
-
-## 4. Run with ArgoCD (GitOps)
-
-### Prerequisites
-
-* Kubernetes cluster with ArgoCD installed
-* `kubectl` access to the cluster
-
-### Apply ArgoCD Manifests
+## 4. GitOps with ArgoCD
 
 ```bash
 kubectl apply -f User_service_app/argocd/users-backend.yaml
 kubectl apply -f User_service_app/argocd/users-frontend.yaml
 ```
 
-ArgoCD will sync and deploy both frontend and backend automatically.
-
 ---
 
-## 5. Infrastructure with Terraform
-
-Infrastructure provisioning is defined under `User_service_app/terraform/`.
-
-### Example
+## 5. Infra with Terraform
 
 ```bash
 cd User_service_app/terraform
@@ -203,17 +138,77 @@ terraform apply
 
 ---
 
-## 6. Project Structure
+# Medallion ETL on PySpark
+
+Runs a **PySpark + JupyterLab** stack with Medallion layers:
+
+* **Bronze**: raw + lineage
+* **Silver**: cleaned, standardized
+* **Gold**: analytics (gender, pincode, profile activity)
+
+---
+
+## Structure
 
 ```
-User_service_app/
-│── backend/
-│   └── users-service/         # Spring Boot backend
-│── frontend/                  # Next.js frontend
-│── argocd/                    # ArgoCD manifests
-│── helm/                      # Helm charts
-│── terraform/                 # Infra provisioning
-│── docker-compose.yml         # Local Docker Compose setup
-│── README.md                  # Project instructions
+medallion-etl/
+├─ Dockerfile
+├─ docker-compose.yml
+├─ workspace/
+│  └─ Medallion_PySpark_4CSVs.ipynb
+└─ data/
+   ├─ profiles.csv
+   ├─ profile_phones.csv
+   ├─ profile_addresses.csv
+   └─ profile_history.csv
 ```
+
+---
+
+## Run
+
+1. **Start**
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Jupyter**
+
+   * URL: [http://localhost:8888/?token=lab](http://localhost:8888/?token=lab)
+   * Token configurable via `docker-compose.yml`.
+
+3. **Execute notebook**
+
+   * Open `workspace/Medallion_PySpark_4CSVs.ipynb`
+   * Run cells → writes Parquet under `./medallion/pyspark/{bronze|silver|gold}`.
+
+4. **Stop**
+
+   ```bash
+   docker compose down
+   ```
+
+---
+
+## Optional: MySQL Output
+
+* Default DB: `medallion` (root/root)
+* Host: `mysql` (inside Docker network)
+
+Create DBs if needed:
+
+```bash
+docker exec -it medallion-mysql mysql -uroot -proot -e \
+"CREATE DATABASE IF NOT EXISTS bronze; \
+ CREATE DATABASE IF NOT EXISTS silver; \
+ CREATE DATABASE IF NOT EXISTS gold;"
+```
+
+Notebook flag:
+
+```python
+WRITE_TO_MYSQL = True
+```
+
 
