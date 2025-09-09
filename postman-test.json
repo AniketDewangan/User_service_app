@@ -1,0 +1,120 @@
+{
+  "info": {
+    "name": "Profiles API",
+    "_postman_id": "12345678-abcd-efgh-ijkl-1234567890ab",
+    "description": "Postman collection for Profiles API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/health"
+      }
+    },
+    {
+      "name": "Get All Profiles",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/profiles"
+      }
+    },
+    {
+      "name": "Create Profile",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"dob\": \"1990-01-01\",\n  \"sex\": \"M\",\n  \"password\": \"secret123\",\n  \"phones\": [\"+911234567890\"],\n  \"addresses\": [\"123 Street, City\"]\n}"
+        },
+        "url": "{{baseUrl}}/api/profiles"
+      }
+    },
+    {
+      "name": "Get Profile By ID",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/profiles/1"
+      }
+    },
+    {
+      "name": "Update Profile",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"John Updated\",\n  \"email\": \"john.doe@example.com\",\n  \"dob\": \"1990-01-01\",\n  \"sex\": \"M\",\n  \"password\": \"secret123\",\n  \"phones\": [\"+911234567890\"],\n  \"addresses\": [\"456 New Street, City\"]\n}"
+        },
+        "url": "{{baseUrl}}/api/profiles/1"
+      }
+    },
+    {
+      "name": "Delete Profile",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/profiles/1"
+      }
+    },
+    {
+      "name": "Get Profile By Email",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/profiles/email/john.doe@example.com"
+      }
+    },
+    {
+      "name": "Verify Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"password\": \"secret123\"\n}"
+        },
+        "url": "{{baseUrl}}/api/profiles/1/verify-password"
+      }
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"secret123\"\n}"
+        },
+        "url": "{{baseUrl}}/api/profiles/login"
+      }
+    },
+    {
+      "name": "Get Profile Update Count",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/profiles/1/update-count"
+      }
+    },
+    {
+      "name": "Get Profile History",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/profiles/1/history"
+      }
+    },
+    {
+      "name": "Test Endpoint",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/profiles/test"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ]
+}
